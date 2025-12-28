@@ -1,0 +1,8 @@
+{
+  "name": "Doll Collection AI",
+  "description": "A smart collection manager for your plushies and dolls, featuring AI-powered identification and organization.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

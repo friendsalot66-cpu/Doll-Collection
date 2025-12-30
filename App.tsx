@@ -87,11 +87,11 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto min-h-screen relative flex flex-col shadow-2xl overflow-hidden bg-background-light dark:bg-background-dark">
+    <div className="w-full h-full max-w-7xl mx-auto relative flex flex-col shadow-2xl overflow-hidden bg-background-light dark:bg-background-dark">
       <div className="absolute inset-0 bubble-pattern opacity-50 pointer-events-none z-0"></div>
       
       {/* View Container */}
-      <div className="flex-1 relative z-10 h-[calc(100vh-80px)] overflow-hidden">
+      <div className="flex-1 relative w-full overflow-hidden">
         {renderView()}
       </div>
 

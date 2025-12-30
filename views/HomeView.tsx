@@ -507,17 +507,17 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
             )}
         </main>
 
-        {/* Floating Action Button */}
+        {/* Floating Action Button - FIXED Position */}
         <button 
             onClick={() => setIsAddModalOpen(true)}
-            className="absolute bottom-24 right-6 bg-primary/40 backdrop-blur-md text-white p-4 rounded-full shadow-lg hover:bg-primary/60 transition-all hover:scale-110 z-30 flex items-center justify-center"
+            className="fixed bottom-24 right-6 bg-primary/40 backdrop-blur-md text-white p-4 rounded-full shadow-lg hover:bg-primary/60 transition-all hover:scale-110 z-40 flex items-center justify-center"
         >
             <span className="material-icons-round text-2xl drop-shadow-sm">add_a_photo</span>
         </button>
 
         {/* Add Modal */}
         {isAddModalOpen && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                 <div className="bg-white dark:bg-card-dark rounded-2xl w-full max-w-sm p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-bold text-slate-800 dark:text-white">Add to {currentTopic.name}</h2>
@@ -617,7 +617,7 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
 
         {/* Detail/Edit Modal */}
         {selectedDoll && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" onClick={() => setSelectedDoll(null)}>
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" onClick={() => setSelectedDoll(null)}>
                 <div className="bg-white dark:bg-card-dark rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease-out] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
                     <div className="relative bg-black/5 dark:bg-black/40 flex-1 min-h-[50%] overflow-hidden">
                          {/* Full Picture View: object-contain */}

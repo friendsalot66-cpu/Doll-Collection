@@ -4,6 +4,7 @@ import { Doll, Category, NewDollForm, Topic, SortOption, GridOption } from '../t
 import DollCard from '../components/DollCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { identifyDoll } from '../services/geminiService';
+import { compressImage } from '../services/utils';
 
 interface HomeViewProps {
   currentTopic: Topic;
@@ -12,7 +13,7 @@ interface HomeViewProps {
   onClearInitialCategory: () => void;
 }
 
-type FilterType = 'ALL' | 'NEW' | 'DATE_FILTER' | string; // 'ALL', 'NEW', 'DATE_FILTER', or Category ID
+type FilterType = 'ALL' | 'NEW' | 'DATE_FILTER' | string;
 
 const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, onUpdateTopic, onClearInitialCategory }) => {
   const [dolls, setDolls] = useState<Doll[]>([]);
@@ -21,7 +22,9 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
   
   // View/Sort State
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
-  const [dateFilterValue, setDateFilterValue] = useState<string>('');
+  const [dateFilterValue, setDateFilterValue] = useState<string>(''); // Format YYYY-MM
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   
   const [sortOption, setSortOption] = useState<SortOption>('DATE_DESC');
   const [gridOption, setGridOption] = useState<GridOption>('GRID_3');
@@ -97,7 +100,15 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
   const processedDolls = useMemo(() => {
     let result = [...dolls];
 
-    // Filter
+    // Search Filter
+    if (searchQuery) {
+        result = result.filter(d => 
+            d.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            (d.description && d.description.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+    }
+
+    // Category/Date Filter
     if (activeFilter === 'NEW') {
         result = result.filter(d => {
             const created = new Date(d.created_at);
@@ -107,10 +118,10 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
         });
     } else if (activeFilter === 'DATE_FILTER') {
         if (dateFilterValue) {
-            result = result.filter(d => d.catch_date === dateFilterValue);
+            // Check if catch_date string starts with YYYY-MM
+            result = result.filter(d => d.catch_date && d.catch_date.startsWith(dateFilterValue));
         }
     } else if (activeFilter !== 'ALL') {
-        // Assume activeFilter is a category ID
         result = result.filter(d => d.category_id === activeFilter);
     }
 
@@ -126,7 +137,7 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
     });
 
     return result;
-  }, [dolls, activeFilter, dateFilterValue, sortOption]);
+  }, [dolls, activeFilter, dateFilterValue, sortOption, searchQuery]);
 
   const categoryMap = useMemo(() => {
       const map: Record<string, string> = {};
@@ -177,11 +188,10 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
       
       let newSizes = [...formData.size];
       if (aiData.size) {
-          // Reset default if AI provides input
           newSizes = []; 
           if (aiData.size.includes('Normal')) newSizes.push('Normal');
           if (aiData.size.includes('Small')) newSizes.push('Small');
-          if (newSizes.length === 0) newSizes.push('Normal'); // Fallback
+          if (newSizes.length === 0) newSizes.push('Normal');
       }
 
       setFormData(prev => ({
@@ -216,11 +226,14 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
     
     setLoading(true);
     try {
-      const fileExt = formData.imageFile.name.split('.').pop();
+      // Compress Image
+      const compressedFile = await compressImage(formData.imageFile);
+
+      const fileExt = compressedFile.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
         .from('images')
-        .upload(fileName, formData.imageFile);
+        .upload(fileName, compressedFile);
 
       if (uploadError) throw uploadError;
 
@@ -233,7 +246,7 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
         .insert([{
           name: formData.name,
           description: formData.description,
-          size: formData.size.join(', '), // Store as string
+          size: formData.size.join(', '), 
           category_id: formData.category_id || null,
           topic_id: currentTopic.id,
           catch_date: formData.catch_date,
@@ -259,7 +272,6 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
   // --- Edit Logic ---
   const openDetailModal = (doll: Doll) => {
       setSelectedDoll(doll);
-      // Initialize edit data, splitting size string into array for checkboxes
       setEditDollData({
           ...doll,
           sizeArray: doll.size ? doll.size.split(',').map(s => s.trim()) : []
@@ -314,7 +326,6 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
       }
   };
 
-  // Responsive Grid Logic
   const getGridClass = () => {
       switch(gridOption) {
           case 'GRID_2': return 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4';
@@ -328,36 +339,72 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         {/* Header */}
-        <header className="relative z-40 px-6 pt-12 pb-4 bg-white/80 dark:bg-card-dark/80 backdrop-blur-md sticky top-0 border-b border-blue-100 dark:border-slate-700">
-            <div className="flex items-center justify-between mb-4">
-                <button className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition opacity-0 cursor-default">
-                    <span className="material-icons-round text-slate-500">arrow_back_ios_new</span>
+        <header className="relative z-40 px-6 pt-12 pb-4 bg-white/80 dark:bg-card-dark/80 backdrop-blur-md sticky top-0 border-b border-blue-100 dark:border-slate-700 transition-all">
+            <div className="flex items-center justify-between mb-2 h-10">
+                {/* Left: Search Toggle / Back (hidden) */}
+                <button 
+                    onClick={() => {
+                        if (isSearchOpen) {
+                            setIsSearchOpen(false); 
+                            setSearchQuery(''); 
+                        }
+                    }}
+                    className={`p-2 rounded-full transition-all ${isSearchOpen ? 'bg-slate-100 text-slate-600' : 'opacity-0 cursor-default'}`}
+                >
+                     <span className="material-icons-round">{isSearchOpen ? 'close' : 'arrow_back_ios_new'}</span>
                 </button>
-                <div className="text-center group flex flex-col items-center">
-                    {isEditingTitle ? (
-                        <div className="flex items-center gap-2">
-                             <input 
+
+                {/* Center: Title OR Search Bar */}
+                <div className="flex-1 flex justify-center mx-2">
+                    {isSearchOpen ? (
+                        <div className="w-full max-w-xs relative animate-in fade-in zoom-in-95 duration-200">
+                            <input 
                                 autoFocus
-                                value={editTitleName} 
-                                onChange={e => setEditTitleName(e.target.value)} 
-                                onBlur={saveTitleEdit}
-                                onKeyDown={e => e.key === 'Enter' && saveTitleEdit()}
-                                className="bg-white border border-primary rounded px-2 py-0.5 text-center font-bold text-lg w-40"
-                             />
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                placeholder="Search..."
+                                className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-full py-2 px-4 text-sm focus:ring-2 focus:ring-primary/50"
+                            />
+                            <span className="material-icons-round absolute right-3 top-2 text-slate-400 text-sm">search</span>
                         </div>
                     ) : (
-                        <div onClick={() => setIsEditingTitle(true)} className="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition">
-                            <h1 className="text-xl sm:text-2xl font-display font-bold text-slate-800 dark:text-white tracking-wide">
-                                {currentTopic.name}
-                            </h1>
-                            <span className="material-icons-round text-sm text-slate-300">edit</span>
+                        <div className="text-center group flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
+                             {isEditingTitle ? (
+                                <input 
+                                    autoFocus
+                                    value={editTitleName} 
+                                    onChange={e => setEditTitleName(e.target.value)} 
+                                    onBlur={saveTitleEdit}
+                                    onKeyDown={e => e.key === 'Enter' && saveTitleEdit()}
+                                    className="bg-white border border-primary rounded px-2 py-0.5 text-center font-bold text-lg w-40"
+                                />
+                            ) : (
+                                <div onClick={() => setIsEditingTitle(true)} className="flex items-center gap-2 cursor-pointer p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition">
+                                    <h1 className="text-xl sm:text-2xl font-display font-bold text-slate-800 dark:text-white tracking-wide truncate max-w-[200px]">
+                                        {currentTopic.name}
+                                    </h1>
+                                    <span className="material-icons-round text-sm text-slate-300">edit</span>
+                                </div>
+                            )}
+                            <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+                                {processedDolls.length} Collected
+                            </p>
                         </div>
                     )}
-                    <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">
-                        {processedDolls.length} Collected
-                    </p>
                 </div>
+
+                {/* Right: Actions */}
                 <div className="flex items-center gap-1 relative">
+                    {/* Search Trigger */}
+                     {!isSearchOpen && (
+                        <button 
+                            onClick={() => setIsSearchOpen(true)}
+                            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                        >
+                            <span className="material-icons-round text-slate-500 dark:text-slate-300">search</span>
+                        </button>
+                     )}
+
                     {/* Grid Button */}
                     <button 
                         onClick={() => { setShowGridMenu(!showGridMenu); setShowSortMenu(false); }}
@@ -413,11 +460,11 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
                     New
                 </button>
 
-                {/* Catch Date Filter */}
+                {/* Catch Date Filter (Month) */}
                 <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold shadow-soft border transition-colors ${activeFilter === 'DATE_FILTER' ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-card-dark text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}>
-                    <span className="material-icons-round text-sm">calendar_today</span>
+                    <span className="material-icons-round text-sm">calendar_month</span>
                     <input 
-                        type="date" 
+                        type="month" 
                         value={dateFilterValue}
                         onChange={(e) => {
                             setDateFilterValue(e.target.value);
@@ -470,7 +517,7 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
 
         {/* Add Modal */}
         {isAddModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                 <div className="bg-white dark:bg-card-dark rounded-2xl w-full max-w-sm p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-bold text-slate-800 dark:text-white">Add to {currentTopic.name}</h2>
@@ -570,15 +617,16 @@ const HomeView: React.FC<HomeViewProps> = ({ currentTopic, initialCategoryId, on
 
         {/* Detail/Edit Modal */}
         {selectedDoll && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md" onClick={() => setSelectedDoll(null)}>
-                <div className="bg-white dark:bg-card-dark rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
-                    <div className="relative h-64 bg-blue-50 dark:bg-slate-800">
-                         <img src={selectedDoll.image_url} className="w-full h-full object-cover" />
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" onClick={() => setSelectedDoll(null)}>
+                <div className="bg-white dark:bg-card-dark rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease-out] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                    <div className="relative bg-black/5 dark:bg-black/40 flex-1 min-h-[50%] overflow-hidden">
+                         {/* Full Picture View: object-contain */}
+                         <img src={selectedDoll.image_url} className="w-full h-full object-contain" />
                          <button onClick={() => setSelectedDoll(null)} className="absolute top-4 right-4 bg-black/20 text-white rounded-full p-1 hover:bg-black/40 backdrop-blur-md z-10">
                             <span className="material-icons-round">close</span>
                          </button>
                     </div>
-                    <div className="p-6">
+                    <div className="p-6 overflow-y-auto shrink-0">
                         {isEditingDoll ? (
                             <div className="space-y-3">
                                 <input 

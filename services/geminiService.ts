@@ -1,9 +1,3 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
-// NOTE: In a production app, never hardcode API keys on the client. 
-// However, per instructions for this demo, we assume the environment variable or a safe context.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-
 // Perplexity API integration for doll identification and category suggestion
 // Reference: https://docs.perplexity.ai/guides/chat-completions-sdk
 // Reference: https://docs.perplexity.ai/guides/structured-outputs

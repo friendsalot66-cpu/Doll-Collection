@@ -2,8 +2,7 @@
 // Reference: https://docs.perplexity.ai/guides/chat-completions-sdk
 // Reference: https://docs.perplexity.ai/guides/structured-outputs
 
-const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY || '';
-const PERPLEXITY_API_URL = 'https://api.perplexity.ai/v1/chat/completions';
+const PERPLEXITY_PROXY_URL = '/api/perplexity'; // Use relative path for Vercel
 
 // Helper to convert File to Base64
 export const fileToBase64 = async (file: File): Promise<string> => {
@@ -47,15 +46,14 @@ async function callPerplexity(messages: any[], imageBase64?: string, mimeType?: 
       },
     ];
   }
-  const res = await fetch(PERPLEXITY_API_URL, {
+  const res = await fetch(PERPLEXITY_PROXY_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error('Perplexity API error');
+  if (!res.ok) throw new Error('Perplexity Proxy error');
   const data = await res.json();
   return data.choices?.[0]?.message?.content || '{}';
 }

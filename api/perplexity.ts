@@ -1,6 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
@@ -21,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     const data = await response.json();
     res.status(response.status).json(data);
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 }
